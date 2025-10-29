@@ -193,9 +193,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-For support, email [your-email@example.com] or create an issue in the GitHub repository.
+For support, email [joedanielajd@gmail.com] or create an issue in the GitHub repository.
 
 ---
 
-**Note**: This is a proof-of-concept application for educational and demonstration purposes. For production use cases involving real security concerns, please implement actual anomaly detection algorithms and additional security measures.
-Securing AI: Trust Beyond Data
