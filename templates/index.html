@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section bg-gradient-primary text-white py-5">
+    <div class="container">
+        <div class="row align-items-center min-vh-75">
+            <div class="col-lg-6">
+                <div class="hero-content">
+                    <h1 class="display-4 fw-bold mb-4">
+                        Protect Your AI from
+                        <span class="text-warning">Data Poisoning</span>
+                    </h1>
+                    <p class="lead mb-4">
+                        Advanced integrity verification system that detects and prevents malicious data injection 
+                        attacks in machine learning datasets. Ensure your AI models are trained on clean, trustworthy data.
+                    </p>
+                    <div class="d-flex gap-3">
+                        <a href="{{ url_for('upload_page') }}" class="btn btn-warning btn-lg px-4">
+                            <i class="bi bi-upload me-2"></i>Scan Your Dataset
+                        </a>
+                        <a href="#learn-more" class="btn btn-outline-light btn-lg px-4">
+                            Learn More
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="hero-illustration text-center">
+                    <i class="bi bi-shield-shaded display-1 text-warning opacity-75"></i>
+                    <div class="mt-3">
+                        <div class="d-flex justify-content-center gap-3">
+                            <div class="feature-icon">
+                                <i class="bi bi-file-earmark-check text-success"></i>
+                            </div>
+                            <div class="feature-icon">
+                                <i class="bi bi-search text-info"></i>
+                            </div>
+                            <div class="feature-icon">
+                                <i class="bi bi-graph-up text-warning"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Problem Description -->
+<section id="learn-more" class="py-5">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 mx-auto text-center mb-5">
+                <h2 class="display-5 fw-bold mb-4">The AI Integrity Challenge</h2>
+                <p class="lead text-muted">
+                    Data poisoning attacks represent one of the most critical threats to modern AI systems, 
+                    compromising model reliability and security through malicious dataset manipulation.
+                </p>
+            </div>
+        </div>
+        
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="problem-card h-100 p-4 bg-light rounded-3 shadow-sm">
+                    <div class="text-center mb-3">
+                        <i class="bi bi-exclamation-triangle-fill text-danger display-4"></i>
+                    </div>
+                    <h4 class="fw-bold mb-3">Training Data Manipulation</h4>
+                    <p class="text-muted">
+                        Attackers inject subtle, malicious samples into training datasets, causing models 
+                        to learn incorrect patterns and make targeted errors during inference.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="problem-card h-100 p-4 bg-light rounded-3 shadow-sm">
+                    <div class="text-center mb-3">
+                        <i class="bi bi-eye-slash-fill text-warning display-4"></i>
+                    </div>
+                    <h4 class="fw-bold mb-3">Invisible Threats</h4>
+                    <p class="text-muted">
+                        Poisoned data often appears legitimate to human reviewers, making detection 
+                        extremely challenging without sophisticated analysis tools.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="problem-card h-100 p-4 bg-light rounded-3 shadow-sm">
+                    <div class="text-center mb-3">
+                        <i class="bi bi-graph-down-arrow text-info display-4"></i>
+                    </div>
+                    <h4 class="fw-bold mb-3">Model Performance Degradation</h4>
+                    <p class="text-muted">
+                        Compromised models exhibit reduced accuracy, biased predictions, and 
+                        unexpected behaviors that can have serious real-world consequences.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 mx-auto text-center mb-5">
+                <h2 class="display-5 fw-bold mb-4">Our Solution</h2>
+                <p class="lead text-muted">
+                    PoisonProof AI provides comprehensive dataset integrity verification using 
+                    advanced anomaly detection and cryptographic verification techniques.
+                </p>
+            </div>
+        </div>
+        
+        <div class="row g-4">
+            <div class="col-lg-4">
+                <div class="feature-card text-center p-4">
+                    <div class="feature-icon-lg mb-3">
+                        <i class="bi bi-search text-primary display-4"></i>
+                    </div>
+                    <h4 class="fw-bold mb-3">Anomaly Detection</h4>
+                    <p class="text-muted">
+                        Advanced algorithms scan datasets for suspicious patterns, outliers, 
+                        and potential poisoning attempts with high accuracy.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="col-lg-4">
+                <div class="feature-card text-center p-4">
+                    <div class="feature-icon-lg mb-3">
+                        <i class="bi bi-shield-check text-success display-4"></i>
+                    </div>
+                    <h4 class="fw-bold mb-3">Cryptographic Hashing</h4>
+                    <p class="text-muted">
+                        SHA-256 hashing provides tamper-evident verification, ensuring 
+                        dataset integrity throughout the ML pipeline.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="col-lg-4">
+                <div class="feature-card text-center p-4">
+                    <div class="feature-icon-lg mb-3">
+                        <i class="bi bi-graph-up text-warning display-4"></i>
+                    </div>
+                    <h4 class="fw-bold mb-3">Visual Analytics</h4>
+                    <p class="text-muted">
+                        Interactive dashboards and detailed reports help you understand 
+                        threats and make informed decisions about your data.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Call to Action -->
+<section class="py-5 bg-primary text-white">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 mx-auto text-center">
+                <h2 class="display-5 fw-bold mb-4">Ready to Secure Your AI?</h2>
+                <p class="lead mb-4">
+                    Upload your dataset now and get instant integrity analysis with detailed anomaly reports.
+                </p>
+                <a href="{{ url_for('upload_page') }}" class="btn btn-warning btn-lg px-5">
+                    <i class="bi bi-upload me-2"></i>Start Scanning
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
