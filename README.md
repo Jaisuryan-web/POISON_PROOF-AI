@@ -6,7 +6,7 @@ A modern Flask web application that simulates a proof-of-concept for AI integrit
 
 - **Modern Web Interface**: Clean, responsive design using Bootstrap 5
 - **File Upload System**: Support for CSV and image datasets (PNG, JPG, JPEG, GIF, BMP)
-- **Anomaly Detection**: Simulated scanning for suspicious patterns and outliers
+- **Anomaly Detection**: Real detection for CSVs using robust statistics (MAD-based z-scores and IQR) and image checks via Error Level Analysis (ELA) and blur metrics
 - **Cryptographic Verification**: SHA-256 hashing for dataset integrity verification
 - **Visual Analytics**: Interactive charts showing anomaly distribution
 - **Real-time Processing**: Loading indicators and progress tracking
@@ -134,18 +134,20 @@ The application supports multiple environments through `config.py`:
 - **Testing**: Configured for automated testing
 
 ## 🧪 Simulated Anomaly Detection
+The application uses lightweight, real anomaly identification methods without heavy ML dependencies:
 
-The current implementation includes simulated anomaly detection for demonstration purposes:
-
-### CSV Files
-- Random outlier detection
-- Data pattern analysis simulation
-- Column-wise anomaly flagging
+### CSV Files (tabular)
+- Robust z-score using Median Absolute Deviation (MAD)
+- IQR (interquartile range) fences per numeric column
+- Per-row aggregation into severity + confidence
+   - Tunables in `app.py`: z-score threshold (3.5), IQR factor (1.5), max results (50)
 
 ### Image Files
-- Visual manipulation detection
-- Pixel-level anomaly simulation
-- Adversarial pattern identification
+- Error Level Analysis (ELA) to flag potential edits/recompression
+- Blur/texture check via gradient variance
+- Dynamic range check for over-compression/washed-out images
+
+These can be tuned in `app.py` inside `_detect_csv_anomalies` and `_analyze_image`.
 
 ## 🚀 Deployment
 

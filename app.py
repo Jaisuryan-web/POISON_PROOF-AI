@@ -5,7 +5,8 @@ import numpy as np
 import json
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from werkzeug.utils import secure_filename
-from PIL import Image
+from PIL import Image, ImageChops
+from io import BytesIO
 import plotly.graph_objs as go
 import plotly.utils
 from config import config
@@ -99,36 +100,184 @@ def calculate_file_hash(filepath):
             sha256_hash.update(byte_block)
     return sha256_hash.hexdigest()
 
-def simulate_anomaly_detection(filepath, file_type):
-    """
-    Simulate anomaly detection on uploaded dataset
-    Returns dummy flagged data for demonstration
+def _robust_z_score(series: pd.Series):
+    """Compute robust z-scores using Median Absolute Deviation (MAD)."""
+    s = pd.to_numeric(series, errors='coerce')
+    med = np.nanmedian(s)
+    mad = np.nanmedian(np.abs(s - med))
+    if mad == 0 or np.isnan(mad):
+        # Fallback to standard deviation if MAD is zero
+        std = np.nanstd(s)
+        if std == 0 or np.isnan(std):
+            return pd.Series(np.zeros(len(s)), index=series.index)
+        return (s - np.nanmean(s)) / std
+    return 0.6745 * (s - med) / mad
+
+
+def _iqr_bounds(series: pd.Series):
+    """Return lower and upper bounds using IQR method."""
+    s = pd.to_numeric(series, errors='coerce')
+    q1 = np.nanpercentile(s, 25)
+    q3 = np.nanpercentile(s, 75)
+    iqr = q3 - q1
+    lower = q1 - 1.5 * iqr
+    upper = q3 + 1.5 * iqr
+    return lower, upper
+
+
+def _detect_csv_anomalies(df: pd.DataFrame, max_findings: int = 50):
+    """Detect real anomalies in a CSV using robust statistics on numeric columns.
+
+    - Uses robust z-score (MAD) and IQR fences per numeric column.
+    - Aggregates per-row anomalies into severity and confidence.
     """
     anomalies = []
-    
+    if df.empty:
+        return anomalies
+
+    # Keep only numeric columns for detection
+    num_df = df.select_dtypes(include=[np.number]).copy()
+    if num_df.empty:
+        return anomalies
+
+    row_scores = np.zeros(len(num_df))
+    detail_records = []
+
+    for col in num_df.columns:
+        rz = _robust_z_score(num_df[col])
+        lower, upper = _iqr_bounds(num_df[col])
+
+        # Flags
+        z_flags = np.abs(rz) > 3.5
+        iqr_flags = (num_df[col] < lower) | (num_df[col] > upper)
+        flags = z_flags | iqr_flags
+
+        # Accumulate row scores by magnitude
+        row_scores += np.where(flags, np.minimum(np.abs(rz.fillna(0)), 10), 0)
+
+        # Record detailed column anomalies
+        flagged_idx = np.where(flags)[0]
+        for idx in flagged_idx:
+            value = num_df.iloc[idx][col]
+            rz_val = float(rz.iloc[idx]) if not np.isnan(rz.iloc[idx]) else 0.0
+            magnitude = min(abs(rz_val) / 4.0, 1.0)  # normalize
+            severity = 'High' if abs(rz_val) > 5 else 'Medium' if abs(rz_val) > 4 else 'Low'
+            detail_records.append({
+                'row': int(idx) + 1,
+                'column': col,
+                'value': None if pd.isna(value) else (float(value) if isinstance(value, (int, float, np.floating, np.integer)) else value),
+                'rz': rz_val,
+                'severity': severity,
+                'confidence': round(0.6 + 0.4 * magnitude, 2)
+            })
+
+    # Rank rows by total anomaly score
+    top_indices = np.argsort(-row_scores)[:max_findings]
+    for idx in top_indices:
+        if row_scores[idx] <= 0:
+            continue
+        # Collect columns for this row
+        cols = [d for d in detail_records if d['row'] == int(idx) + 1]
+        if not cols:
+            continue
+        # Determine overall severity
+        high = any(c['severity'] == 'High' for c in cols)
+        med = any(c['severity'] == 'Medium' for c in cols)
+        severity = 'High' if high else 'Medium' if med else 'Low'
+        confidence = round(min(0.95, 0.5 + 0.05 * len(cols) + 0.02 * float(row_scores[idx])) , 2)
+        columns_str = ', '.join(sorted({c['column'] for c in cols}))
+        anomalies.append({
+            'type': 'Data Outlier',
+            'location': f'Row {int(idx) + 1} (Columns: {columns_str})',
+            'severity': severity,
+            'description': 'Robust statistical detection flagged outlier values (MAD/IQR).',
+            'confidence': confidence
+        })
+
+    # If too few anomalies found, surface a few strongest individual column hits
+    if len(anomalies) < 5 and detail_records:
+        detail_records.sort(key=lambda d: abs(d['rz']), reverse=True)
+        for d in detail_records[: (5 - len(anomalies))]:
+            anomalies.append({
+                'type': 'Column Outlier',
+                'location': f"Row {d['row']}, Column '{d['column']}'",
+                'severity': d['severity'],
+                'description': 'Value deviates significantly from distribution (robust z-score).',
+                'confidence': d['confidence']
+            })
+
+    return anomalies
+
+
+def _analyze_image(filepath: str):
+    """Detect basic image anomalies: potential manipulation (ELA) and blur (gradient variance)."""
+    findings = []
+    with Image.open(filepath) as img:
+        img = img.convert('RGB')
+
+        # Error Level Analysis (ELA) - approximate manipulation signal
+        buf = BytesIO()
+        img.save(buf, format='JPEG', quality=90)
+        buf.seek(0)
+        comp = Image.open(buf).convert('RGB')
+
+        diff = ImageChops.difference(img, comp)
+        diff_np = np.asarray(diff, dtype=np.uint8)
+        ela_score = float(diff_np.mean())  # average difference
+
+        # Heuristic thresholds (tunable)
+        if ela_score > 12.0:
+            findings.append({
+                'type': 'Visual Manipulation',
+                'location': 'Global',
+                'severity': 'High' if ela_score > 20 else 'Medium',
+                'description': 'Error Level Analysis suggests possible local recompression or edits.',
+                'confidence': round(min(0.95, 0.5 + (ela_score / 40.0)), 2)
+            })
+
+        # Blur/Sharpness via simple gradient variance (no OpenCV dependency)
+        gray = np.asarray(img.convert('L'), dtype=np.float32)
+        # Simple finite differences
+        gx = gray[:, 1:] - gray[:, :-1]
+        gy = gray[1:, :] - gray[:-1, :]
+        grad_mag = np.sqrt(gx[:, :-1] ** 2 + gy[:-1, :] ** 2)
+        grad_var = float(np.var(grad_mag))
+
+        if grad_var < 25.0:  # low gradient variance => possibly blurry
+            findings.append({
+                'type': 'Image Quality',
+                'location': 'Global',
+                'severity': 'Medium' if grad_var < 15 else 'Low',
+                'description': 'Low edge/texture energy indicates blur or low-detail image.',
+                'confidence': round(0.6 if grad_var < 20 else 0.55, 2)
+            })
+
+        # Dynamic range check (very narrow intensity spread)
+        rng = float(gray.max() - gray.min())
+        if rng < 30.0:
+            findings.append({
+                'type': 'Image Quality',
+                'location': 'Global',
+                'severity': 'Low',
+                'description': 'Very low dynamic range; image may be washed out or overly compressed.',
+                'confidence': 0.55
+            })
+
+    return findings
+
+
+def simulate_anomaly_detection(filepath, file_type):
+    """
+    Perform anomaly detection on uploaded dataset using lightweight, real methods:
+    - CSV: robust statistics (MAD-based z-scores and IQR fences) on numeric columns
+    - Images: ELA (error level analysis) + blur/dynamic range checks
+    """
+    anomalies = []
+
     if file_type == 'csv':
         try:
-            # Read CSV file
             df = pd.read_csv(filepath)
-            num_rows, num_cols = df.shape
-            
-            # Simulate anomaly detection with dummy data
-            # Generate random anomalies for demonstration
-            num_anomalies = min(5, max(1, num_rows // 20))  # 5% of rows or max 5
-            
-            for i in range(num_anomalies):
-                row_idx = np.random.randint(0, num_rows)
-                col_idx = np.random.randint(0, num_cols)
-                col_name = df.columns[col_idx] if col_idx < len(df.columns) else f'Column_{col_idx}'
-                
-                anomalies.append({
-                    'type': 'Data Outlier',
-                    'location': f'Row {row_idx + 1}, Column "{col_name}"',
-                    'severity': np.random.choice(['High', 'Medium', 'Low']),
-                    'description': f'Suspicious value detected: potential data poisoning',
-                    'confidence': round(np.random.uniform(0.7, 0.95), 2)
-                })
-                
+            anomalies = _detect_csv_anomalies(df, max_findings=50)
         except Exception as e:
             anomalies.append({
                 'type': 'File Error',
@@ -137,28 +286,10 @@ def simulate_anomaly_detection(filepath, file_type):
                 'description': f'Error reading CSV file: {str(e)}',
                 'confidence': 1.0
             })
-    
+
     elif file_type in ['png', 'jpg', 'jpeg', 'gif', 'bmp']:
         try:
-            # Simulate image anomaly detection
-            img = Image.open(filepath)
-            width, height = img.size
-            
-            # Generate dummy image anomalies
-            num_anomalies = np.random.randint(1, 4)
-            
-            for i in range(num_anomalies):
-                x = np.random.randint(0, width)
-                y = np.random.randint(0, height)
-                
-                anomalies.append({
-                    'type': 'Visual Manipulation',
-                    'location': f'Pixel region ({x}, {y})',
-                    'severity': np.random.choice(['High', 'Medium', 'Low']),
-                    'description': 'Potential adversarial pattern or manipulation detected',
-                    'confidence': round(np.random.uniform(0.6, 0.9), 2)
-                })
-                
+            anomalies = _analyze_image(filepath)
         except Exception as e:
             anomalies.append({
                 'type': 'File Error',
@@ -167,7 +298,7 @@ def simulate_anomaly_detection(filepath, file_type):
                 'description': f'Error processing image: {str(e)}',
                 'confidence': 1.0
             })
-    
+
     return anomalies
 
 def generate_anomaly_chart(anomalies):

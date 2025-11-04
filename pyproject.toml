@@ -1,0 +1,14 @@
+[project]
+name = "poisonproof-ai"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "flask==2.3.3",
+    "numpy>=1.26,<3.0",
+    "pandas>=2.2,<3.0",
+    "pillow==10.0.1",
+    "plotly==5.17.0",
+    "werkzeug==2.3.7",
+]
