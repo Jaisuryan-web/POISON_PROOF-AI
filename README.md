@@ -8,7 +8,93 @@ PoisonProof AI is a modern Flask web app that helps you assess dataset integrity
 
 This README walks you from installing uv (fast Python package manager) to running and using the app, and then dives deep into how anomalies are detected with examples.
 
-## 🚀 Features
+## 🔐 Secure Lab Flow (Enhanced)
+
+- Entry: Home with Matrix rain background → "Scan Your Dataset" → `/secure-upload`
+- Upload: CSV or image is validated, hashed (SHA-256), stored under `uploads/`, and tagged with a session ID
+- Scan: 
+  - CSV: MAD + IQR + 40+ injection signatures (XSS, SQLi, command injection, path traversal, LDAP, NoSQL)
+  - Images: ELA + blur + EXIF metadata + entropy analysis (steganography detection)
+- Results: Color-coded table + Plotly chart + copyable hash + threat meter
+- Clean:
+  - Auto: drops High severity rows with animated completion
+  - Manual: interactive checkbox review for precise control
+- Train: **LIVE** real-time streaming console with Server-Sent Events showing training progress
+- Models Dashboard: Compare all trained models with accuracy charts and hash verification
+- API: RESTful endpoints for programmatic access + audit log export (JSON/CSV)
+- Logs: Complete audit trail in `logs/audit.json`; model registry in `trained_models/model_hashes.json`
+
+## 🚀 Quick Start (Windows PowerShell with uv)
+
+Install dependencies and run:
+```powershell
+uv sync
+uv run python .\run.py
+```
+
+Access at: `http://127.0.0.1:5000`
+
+## 🎨 New Cyber Features
+
+### Matrix Rain Background
+- Animated binary rain on landing page
+- Neon glow effects on headings
+- Futuristic cyber-lab aesthetic
+
+### Live Training Console
+- Real-time Server-Sent Events streaming
+- Epoch-by-epoch progress updates
+- Animated metrics display
+- Model hash generation with verification
+
+### Advanced Detection
+- **40+ Payload Signatures**: XSS, SQLi, command injection, path traversal, LDAP, NoSQL
+- **Image Forensics**: EXIF metadata analysis, entropy-based steganography detection
+- **Enhanced ELA**: Improved Error Level Analysis with confidence scores
+
+### Model Comparison Dashboard
+- View all trained models in one place
+- Accuracy/precision/recall comparison charts
+- Hash verification status for each model
+- Download or delete models
+- Best model highlighting
+
+## 📡 API Endpoints
+
+All API endpoints return JSON responses:
+
+### Get Audit Log
+```bash
+GET /api/audit-log
+```
+Returns all audit log entries with session IDs, timestamps, and actions.
+
+### Export Audit Log (CSV)
+```bash
+GET /api/audit-log/export
+```
+Downloads audit log as CSV file.
+
+### Get Models
+```bash
+GET /api/models
+```
+Returns all trained models with metrics and hashes.
+
+### Verify File Hash
+```bash
+POST /api/verify/<expected_hash>
+Content-Type: multipart/form-data
+file: <file_to_verify>
+```
+Verifies file integrity by comparing against expected hash.
+
+Example with curl:
+```bash
+curl -X POST -F "file=@dataset.csv" http://localhost:5000/api/verify/abc123...
+```
+
+## �🚀 Features
 
 - Modern, responsive UI (Bootstrap 5, icons, toasts, progress indicators)
 - CSV and image upload (CSV, PNG, JPG, JPEG, GIF, BMP)

@@ -3,13 +3,24 @@ import hashlib
 import pandas as pd
 import numpy as np
 import json
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_file, Response, stream_with_context
 from werkzeug.utils import secure_filename
 from PIL import Image, ImageChops
 from io import BytesIO
 import plotly.graph_objs as go
 import plotly.utils
 from config import config
+import time
+import queue
+import threading
+
+# New modular utilities
+from utils.security import allowed_file as _allowed_file_util, hash_file as _hash_file_util, schedule_cleanup, log_audit_event
+from utils.detection import detect_csv_anomalies as _detect_csv_anomalies_mod, analyze_image as _analyze_image_mod
+from utils.cleaner import auto_clean as _auto_clean
+from model_trainer import train_model_streaming as _train_model_streaming
+import uuid
+import re
 
 def create_app(config_name=None):
     """Application factory pattern"""
@@ -29,6 +40,15 @@ def create_app(config_name=None):
 
 def register_routes(app):
     """Register all routes with the app"""
+    # Ensure a session id exists for audit and traceability
+    @app.before_request
+    def _ensure_session():
+        try:
+            session.permanent = True
+            if 'session_id' not in session:
+                session['session_id'] = uuid.uuid4().hex[:8]
+        except Exception:
+            pass
     
     @app.route('/')
     def index():
@@ -39,6 +59,11 @@ def register_routes(app):
     def upload_page():
         """File upload page"""
         return render_template('upload.html')
+
+    # Preferred entry per UX flow
+    @app.route('/secure-upload')
+    def secure_upload():
+        return redirect(url_for('upload_page'))
 
     @app.route('/scan', methods=['POST'])
     def scan_file():
@@ -57,39 +82,342 @@ def register_routes(app):
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
             
-            # Get file extension to determine type
             file_type = filename.rsplit('.', 1)[1].lower()
             
-            # Calculate file hash
-            file_hash = calculate_file_hash(filepath)
+            df = pd.read_csv(filepath)
+            anomalies = _detect_csv_anomalies_mod(df)
             
-            # Simulate anomaly detection
-            anomalies = simulate_anomaly_detection(filepath, file_type)
-            
-            # Generate chart
             chart_json = generate_anomaly_chart(anomalies)
             
-            # Clean up uploaded file
-            os.remove(filepath)
+            report = {
+                "filename": filename,
+                "summary": {
+                    "total_anomalies": len(anomalies),
+                    "rows_scanned": len(df),
+                    "integrity_status": "Compromised" if len(anomalies) > 0 else "Secure"
+                },
+                "anomalies": anomalies
+            }
             
+            session['last_upload'] = {
+                'path': filepath,
+                'filename': filename,
+                'file_type': file_type,
+                'sha256': _hash_file_util(filepath),
+            }
+            schedule_cleanup(filepath, delay_seconds=15 * 60)
+
             return render_template('results.html', 
-                                 anomalies=anomalies, 
-                                 file_hash=file_hash,
-                                 filename=filename,
+                                 report=report,
                                  chart_json=chart_json)
         else:
-            flash('Invalid file type. Please upload CSV or image files only.', 'error')
+            flash('Invalid file type. Please upload CSV files only.', 'error')
             return redirect(url_for('upload_page'))
 
     @app.route('/api/scan-status')
     def scan_status():
         """API endpoint for checking scan status (for future real-time updates)"""
         return jsonify({'status': 'completed'})
+    
+    @app.route('/api/audit-log', methods=['GET'])
+    def api_audit_log():
+        """Export audit log as JSON."""
+        from utils.security import AUDIT_LOG_PATH
+        try:
+            with open(AUDIT_LOG_PATH, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            return jsonify({'success': True, 'count': len(data), 'logs': data})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    @app.route('/api/audit-log/export')
+    def export_audit_csv():
+        """Export audit log as CSV file."""
+        from utils.security import AUDIT_LOG_PATH
+        import csv
+        from io import StringIO
+        
+        try:
+            with open(AUDIT_LOG_PATH, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            output = StringIO()
+            if data:
+                writer = csv.DictWriter(output, fieldnames=data[0].keys())
+                writer.writeheader()
+                writer.writerows(data)
+            
+            output.seek(0)
+            return Response(
+                output.getvalue(),
+                mimetype='text/csv',
+                headers={'Content-Disposition': 'attachment; filename=audit_log.csv'}
+            )
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    @app.route('/api/models', methods=['GET'])
+    def api_models():
+        """Get all models information as JSON."""
+        from model_trainer import HASHES_PATH
+        try:
+            with open(HASHES_PATH, 'r', encoding='utf-8') as f:
+                models = json.load(f)
+            return jsonify({'success': True, 'count': len(models), 'models': models})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    @app.route('/api/verify/<file_hash>', methods=['POST'])
+    def api_verify_hash():
+        """Verify a file's hash for integrity checking."""
+        file = request.files.get('file')
+        expected_hash = request.view_args.get('file_hash')
+        
+        if not file:
+            return jsonify({'success': False, 'error': 'No file provided'}), 400
+        
+        try:
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=False) as tmp:
+                file.save(tmp.name)
+                actual_hash = _hash_file_util(tmp.name)
+                os.remove(tmp.name)
+            
+            match = (actual_hash == expected_hash)
+            return jsonify({
+                'success': True,
+                'match': match,
+                'expected': expected_hash,
+                'actual': actual_hash,
+                'status': 'verified' if match else 'tampered'
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/clean/<filename>', methods=['GET', 'POST'])
+    def clean_file(filename):
+        """Manual and auto cleaning route."""
+        info = session.get('last_upload')
+        if not info or info.get('filename') != filename:
+            flash('No dataset available for cleaning. Please scan a file first.', 'error')
+            return redirect(url_for('upload_page'))
+
+        path = info.get('path')
+        df = pd.read_csv(path)
+        anomalies = _detect_csv_anomalies_mod(df)
+
+        if request.method == 'GET':
+            # Default to manual review page if there are anomalies
+            if anomalies:
+                return render_template('review.html', anomalies=anomalies, filename=filename)
+            else:
+                # Or show a "no cleaning needed" message
+                flash('No anomalies were found, no cleaning is necessary.', 'info')
+                return redirect(url_for('scan_file'))
+
+        # POST request handles the cleaning
+        rows_to_remove_str = request.form.getlist('rows_to_remove')
+        rows_to_remove = [int(r) for r in rows_to_remove_str if r]
+        
+        from utils.cleaner import manual_clean
+        cleaned_df, report = manual_clean(df, rows_to_remove)
+        
+        cleaned_filename = os.path.splitext(filename)[0] + '_cleaned.csv'
+        cleaned_path = os.path.join(app.config['UPLOAD_FOLDER'], cleaned_filename)
+        cleaned_df.to_csv(cleaned_path, index=False)
+        
+        session['cleaned_csv'] = cleaned_path
+        report['filename'] = filename
+        report['cleaned_filename'] = cleaned_filename
+
+        return render_template('clean.html', report=report)
+
+    @app.route('/clean/auto/<filename>')
+    def auto_clean_file(filename):
+        """Auto-clean: Remove all High severity anomalies."""
+        info = session.get('last_upload')
+        if not info or info.get('filename') != filename:
+            flash('No dataset available for cleaning. Please scan a file first.', 'error')
+            return redirect(url_for('upload_page'))
+
+        path = info.get('path')
+        df = pd.read_csv(path)
+        anomalies = _detect_csv_anomalies_mod(df)
+
+        from utils.cleaner import auto_clean
+        cleaned_df, report = auto_clean(df, anomalies)
+        
+        cleaned_filename = os.path.splitext(filename)[0] + '_cleaned.csv'
+        cleaned_path = os.path.join(app.config['UPLOAD_FOLDER'], cleaned_filename)
+        cleaned_df.to_csv(cleaned_path, index=False)
+        
+        session['cleaned_csv'] = cleaned_path
+        report['filename'] = filename
+        report['cleaned_filename'] = cleaned_filename
+
+        return render_template('clean.html', report=report)
+
+    @app.route('/train', methods=['GET'])
+    def train_model():
+        return render_template('train.html')
+
+    @app.route('/train', methods=['POST'])
+    def train_model_post():
+        """Train a simple model on a cleaned CSV - starts async training and redirects to live console."""
+        file = request.files.get('file')
+        model_type = request.form.get('model_type', 'LogisticRegression')
+        
+        if not file or file.filename == '':
+            flash('Please upload a cleaned CSV file.', 'error')
+            return redirect(url_for('train_model'))
+            
+        filename = secure_filename(file.filename)
+        path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(path)
+        
+        job_id = uuid.uuid4().hex[:8]
+        session['training_job'] = {
+            'job_id': job_id,
+            'path': path,
+            'model_type': model_type,
+            'status': 'queued'
+        }
+        
+        return redirect(url_for('train_live', job_id=job_id))
+    
+    @app.route('/train/live/<job_id>')
+    def train_live(job_id):
+        """Live training console page with SSE connection."""
+        return render_template('train_live.html', job_id=job_id)
+    
+    @app.route('/train/stream/<job_id>')
+    def train_stream(job_id):
+        """Server-Sent Events stream for real-time training progress."""
+        job = session.get('training_job')
+        if not job or job.get('job_id') != job_id:
+            return Response("data: {\"error\": \"Job not found\"}\n\n", mimetype='text/event-stream')
+        
+        def generate():
+            try:
+                path = job.get('path')
+                model_type = job.get('model_type')
+                df = pd.read_csv(path)
+                
+                for event in _train_model_streaming(df, model_type=model_type):
+                    yield f"data: {json.dumps(event)}\n\n"
+                    time.sleep(0.1)
+                
+                yield f"data: {json.dumps({'message': 'complete'})}\n\n"
+                
+            except Exception as e:
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        
+        return Response(stream_with_context(generate()), mimetype='text/event-stream')
+
+    @app.route('/download/cleaned', methods=['GET'])
+    def download_cleaned():
+        path = session.get('cleaned_csv')
+        if path and os.path.exists(path):
+            return send_file(path, as_attachment=True)
+        flash('Cleaned file is not available. Please run cleaning again.', 'error')
+        return redirect(url_for('upload_page'))
+    
+    @app.route('/models')
+    def models_dashboard():
+        """Model comparison dashboard showing all trained models."""
+        from model_trainer import HASHES_PATH, TRAINED_DIR
+        try:
+            with open(HASHES_PATH, 'r', encoding='utf-8') as f:
+                models_data = json.load(f)
+            
+            models = []
+            for m in models_data:
+                # Handle both old and new format
+                model_name = m.get('model_name') or m.get('file')
+                model_hash = m.get('hash') or m.get('sha256')
+                
+                # Get accuracy from different formats
+                if 'metrics' in m:
+                    accuracy = m['metrics'].get('accuracy', 0)
+                    precision = m['metrics'].get('precision', 0)
+                    recall = m['metrics'].get('recall', 0)
+                else:
+                    accuracy = m.get('accuracy', 0)
+                    precision = m.get('precision', 0)
+                    recall = m.get('recall', 0)
+                
+                file_path = os.path.join(TRAINED_DIR, model_name)
+                exists = os.path.exists(file_path)
+                verified = False
+                if exists and model_hash:
+                    current_hash = _hash_file_util(file_path)
+                    verified = (current_hash == model_hash)
+                
+                models.append({
+                    "model_name": model_name,
+                    "hash": model_hash,
+                    "metrics": {
+                        "accuracy": accuracy,
+                        "precision": precision,
+                        "recall": recall
+                    },
+                    "trained_at": m.get("trained_at"),
+                    "verified": verified,
+                    "exists": exists
+                })
+
+            models.sort(key=lambda x: x['metrics']['accuracy'], reverse=True)
+            
+            return render_template('models.html', models=models)
+        except FileNotFoundError:
+             return render_template('models.html', models=[])
+        except Exception as e:
+            flash(f'Error loading models: {e}', 'error')
+            return render_template('models.html', models=[])
+    
+    @app.route('/models/download/<filename>')
+    def download_model(filename):
+        """Download a trained model file."""
+        from model_trainer import TRAINED_DIR
+        path = os.path.join(TRAINED_DIR, secure_filename(filename))
+        if os.path.exists(path):
+            return send_file(path, as_attachment=True)
+        flash('Model file not found.', 'error')
+        return redirect(url_for('models_dashboard'))
+    
+    @app.route('/models/delete/<filename>', methods=['POST'])
+    def delete_model(filename):
+        """Delete a trained model."""
+        from model_trainer import TRAINED_DIR, HASHES_PATH
+        filename = secure_filename(filename)
+        path = os.path.join(TRAINED_DIR, filename)
+        
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+            
+            # Remove from registry
+            with open(HASHES_PATH, 'r', encoding='utf-8') as f:
+                models = json.load(f)
+            models = [m for m in models if m.get('file') != filename]
+            with open(HASHES_PATH, 'w', encoding='utf-8') as f:
+                json.dump(models, f, indent=2)
+            
+            flash(f'Model {filename} deleted successfully.', 'success')
+        except Exception as e:
+            flash(f'Error deleting model: {e}', 'error')
+        
+        return redirect(url_for('models_dashboard'))
 
 def allowed_file(filename):
-    """Check if file extension is allowed"""
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in {'csv', 'png', 'jpg', 'jpeg', 'gif', 'bmp'}
+    """Check if file extension is allowed using config."""
+    allowed = {'csv', 'png', 'jpg', 'jpeg', 'gif', 'bmp'}
+    try:
+        # Try to read allowed set from loaded config via current_app if available
+        allowed = config.get('default').ALLOWED_EXTENSIONS  # fallback if app context missing
+    except Exception:
+        pass
+    return _allowed_file_util(filename, allowed)
 
 def calculate_file_hash(filepath):
     """Calculate SHA-256 hash of uploaded file"""
@@ -127,22 +455,18 @@ def _iqr_bounds(series: pd.Series):
 
 def _detect_csv_anomalies(df: pd.DataFrame, max_findings: int = 50):
     """Detect real anomalies in a CSV using robust statistics on numeric columns.
-
     - Uses robust z-score (MAD) and IQR fences per numeric column.
     - Aggregates per-row anomalies into severity and confidence.
     """
     anomalies = []
     if df.empty:
         return anomalies
-
     # Keep only numeric columns for detection
     num_df = df.select_dtypes(include=[np.number]).copy()
     if num_df.empty:
         return anomalies
-
     row_scores = np.zeros(len(num_df))
     detail_records = []
-
     for col in num_df.columns:
         rz = _robust_z_score(num_df[col])
         lower, upper = _iqr_bounds(num_df[col])
@@ -206,7 +530,12 @@ def _detect_csv_anomalies(df: pd.DataFrame, max_findings: int = 50):
                 'confidence': d['confidence']
             })
 
-    return anomalies
+    # Integrate injection signature scan for text columns for this legacy path
+    try:
+        from utils.detection import detect_csv_anomalies as _mod
+        return _mod(df, max_findings=max_findings)
+    except Exception:
+        return anomalies
 
 
 def _analyze_image(filepath: str):
@@ -263,7 +592,11 @@ def _analyze_image(filepath: str):
                 'confidence': 0.55
             })
 
-    return findings
+    # Prefer modular implementation when available
+    try:
+        return _analyze_image_mod(filepath)
+    except Exception:
+        return findings
 
 
 def simulate_anomaly_detection(filepath, file_type):

@@ -1,217 +1,94 @@
 {% extends "base.html" %}
 
-{% block title %}Scan Results - PoisonProof AI{% endblock %}
+{% block title %}Scan Results - PoisonProof AI Secure Lab{% endblock %}
 
 {% block extra_head %}
-<!-- Plotly.js for charts -->
 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<style>
+    .severity-high { color: var(--danger); }
+    .severity-medium { color: var(--warning); }
+    .severity-low { color: var(--accent-cyan); }
+</style>
 {% endblock %}
 
 {% block content %}
-<section class="py-5">
-    <div class="container">
-        <!-- Page Header -->
-        <div class="text-center mb-5">
-            <h1 class="display-4 fw-bold text-primary mb-3">
-                <i class="bi bi-file-medical me-3"></i>Scan Results
-            </h1>
-            <p class="lead text-muted">
-                Comprehensive integrity analysis for <strong>{{ filename }}</strong>
-            </p>
-        </div>
+<div class="container mt-4 fade-in">
+    <div class="text-center">
+        <h1>Scan Results</h1>
+        <p class="text-light opacity-75">Integrity analysis for: <strong>{{ report.filename }}</strong></p>
+    </div>
 
-        <!-- Summary Cards -->
-        <div class="row mb-5">
-            <div class="col-md-4">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-body text-center p-4">
-                        <i class="bi bi-exclamation-triangle-fill display-4 mb-3 
-                           {% if anomalies|length > 0 %}text-danger{% else %}text-success{% endif %}"></i>
-                        <h3 class="fw-bold {% if anomalies|length > 0 %}text-danger{% else %}text-success{% endif %}">
-                            {{ anomalies|length }}
-                        </h3>
-                        <h5 class="text-muted">Anomalies Detected</h5>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-body text-center p-4">
-                        <i class="bi bi-shield-check display-4 text-primary mb-3"></i>
-                        <h5 class="fw-bold text-truncate" style="font-size: 0.9rem;">{{ file_hash[:16] }}...</h5>
-                        <h5 class="text-muted">SHA-256 Hash</h5>
-                        <button class="btn btn-sm btn-outline-primary" onclick="copyHash()">
-                            <i class="bi bi-clipboard me-1"></i>Copy Full Hash
-                        </button>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-body text-center p-4">
-                        <i class="bi bi-check-circle-fill display-4 text-success mb-3"></i>
-                        <h3 class="fw-bold text-success">Complete</h3>
-                        <h5 class="text-muted">Scan Status</h5>
-                    </div>
-                </div>
+    <!-- Summary Cards -->
+    <div class="row g-4 my-4">
+        <div class="col-md-4">
+            <div class="cyber-card text-center">
+                <h3 class="h1 {{ 'severity-high' if report.summary.total_anomalies > 0 else 'severity-low' }}">{{ report.summary.total_anomalies }}</h3>
+                <p class="text-light opacity-75 mb-0">Anomalies Detected</p>
             </div>
         </div>
-
-        <!-- Anomalies Section -->
-        {% if anomalies %}
-        <div class="row">
-            <div class="col-lg-8">
-                <div class="card border-0 shadow-sm mb-4">
-                    <div class="card-header bg-danger text-white py-3">
-                        <h4 class="mb-0">
-                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                            Detected Anomalies ({{ anomalies|length }})
-                        </h4>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-hover mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Type</th>
-                                        <th>Location</th>
-                                        <th>Severity</th>
-                                        <th>Confidence</th>
-                                        <th>Description</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for anomaly in anomalies %}
-                                    <tr>
-                                        <td>
-                                            <span class="badge bg-secondary">{{ anomaly.type }}</span>
-                                        </td>
-                                        <td>
-                                            <code class="text-muted">{{ anomaly.location }}</code>
-                                        </td>
-                                        <td>
-                                            <span class="badge 
-                                                {% if anomaly.severity == 'High' %}bg-danger
-                                                {% elif anomaly.severity == 'Medium' %}bg-warning
-                                                {% else %}bg-success{% endif %}">
-                                                {{ anomaly.severity }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div class="progress" style="height: 20px;">
-                                                <div class="progress-bar 
-                                                    {% if anomaly.confidence >= 0.8 %}bg-danger
-                                                    {% elif anomaly.confidence >= 0.6 %}bg-warning
-                                                    {% else %}bg-success{% endif %}"
-                                                     role="progressbar" 
-                                                     style="width: {{ (anomaly.confidence * 100)|round }}%">
-                                                    {{ (anomaly.confidence * 100)|round }}%
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>{{ anomaly.description }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Visualization Column -->
-            <div class="col-lg-4">
-                {% if chart_json %}
-                <div class="card border-0 shadow-sm mb-4">
-                    <div class="card-header bg-primary text-white py-3">
-                        <h5 class="mb-0">
-                            <i class="bi bi-pie-chart-fill me-2"></i>Severity Distribution
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="anomalyChart"></div>
-                    </div>
-                </div>
-                {% endif %}
+        <div class="col-md-4">
+            <div class="cyber-card text-center">
+                <h3 class="h1">{{ report.summary.rows_scanned }}</h3>
+                <p class="text-light opacity-75 mb-0">Rows Scanned</p>
             </div>
         </div>
-        {% else %}
-        <!-- No Anomalies Found -->
-        <div class="text-center py-5">
-            <div class="card border-success shadow-sm">
-                <div class="card-body p-5">
-                    <i class="bi bi-check-circle-fill display-1 text-success mb-4"></i>
-                    <h2 class="fw-bold text-success mb-3">Dataset Clean!</h2>
-                    <p class="lead text-muted mb-4">
-                        No anomalies or suspicious patterns detected in your dataset. 
-                        Your data appears to be free from potential poisoning attacks.
-                    </p>
-                    <div class="alert alert-success">
-                        <i class="bi bi-info-circle me-2"></i>
-                        <strong>Recommendation:</strong> Your dataset has passed integrity verification. 
-                        It's safe to use for training machine learning models.
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Dataset Hash Details -->
-        <div class="card border-0 shadow-sm mt-4">
-            <div class="card-header bg-info text-white py-3">
-                <h4 class="mb-0">
-                    <i class="bi bi-fingerprint me-2"></i>Dataset Integrity Hash
-                </h4>
-            </div>
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-md-8">
-                        <h6 class="fw-bold mb-2">SHA-256 Hash:</h6>
-                        <code id="fullHash" class="d-block p-3 bg-light rounded border" style="word-break: break-all;">
-                            {{ file_hash }}
-                        </code>
-                        <small class="text-muted mt-2 d-block">
-                            <i class="bi bi-info-circle me-1"></i>
-                            This cryptographic hash uniquely identifies your dataset. 
-                            Any modification to the data will result in a completely different hash.
-                        </small>
-                    </div>
-                    <div class="col-md-4 text-center">
-                        <button class="btn btn-primary btn-lg" onclick="copyHash()">
-                            <i class="bi bi-clipboard me-2"></i>Copy Hash
-                        </button>
-                        <small class="d-block text-muted mt-2">
-                            Save this hash for future verification
-                        </small>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Actions -->
-        <div class="text-center mt-5">
-            <div class="d-flex gap-3 justify-content-center">
-                <a href="{{ url_for('upload_page') }}" class="btn btn-primary btn-lg">
-                    <i class="bi bi-upload me-2"></i>Scan Another Dataset
-                </a>
-                <a href="{{ url_for('index') }}" class="btn btn-outline-primary btn-lg">
-                    <i class="bi bi-house me-2"></i>Back to Home
-                </a>
+        <div class="col-md-4">
+            <div class="cyber-card text-center">
+                <h3 class="h1" style="color: var(--accent-green);">{{ report.summary.integrity_status }}</h3>
+                <p class="text-light opacity-75 mb-0">Integrity Status</p>
             </div>
         </div>
     </div>
-</section>
 
-<!-- Success Toast for Hash Copy -->
-<div class="toast-container position-fixed bottom-0 end-0 p-3">
-    <div id="copyToast" class="toast" role="alert">
-        <div class="toast-header">
-            <i class="bi bi-check-circle-fill text-success me-2"></i>
-            <strong class="me-auto">Success</strong>
-            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+    <!-- Main Results -->
+    <div class="cyber-card">
+        <div class="row g-4">
+            <!-- Anomalies Table -->
+            <div class="col-lg-8">
+                <h2>Detected Anomalies</h2>
+                {% if report.anomalies %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Row</th>
+                                    <th>Column</th>
+                                    <th>Description</th>
+                                    <th>Severity</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for anomaly in report.anomalies %}
+                                    <tr>
+                                        <td>{{ anomaly.row }}</td>
+                                        <td>{{ anomaly.column }}</td>
+                                        <td>{{ anomaly.description }}</td>
+                                        <td><span class="severity-{{ anomaly.severity.lower() }}">{{ anomaly.severity }}</span></td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p style="color: var(--accent-green);">No anomalies detected. The dataset appears to be clean.</p>
+                {% endif %}
+            </div>
+            <!-- Chart -->
+            <div class="col-lg-4">
+                <h2>Analysis Chart</h2>
+                <div id="chart-container" style="min-height: 300px;"></div>
+            </div>
         </div>
-        <div class="toast-body">
-            Hash copied to clipboard successfully!
+        <div class="divider"></div>
+        <!-- Actions -->
+        <div class="text-center">
+            <a href="{{ url_for('secure_upload') }}" class="glow-btn glow-btn-secondary"><i class="bi bi-arrow-left me-2"></i>Scan Another</a>
+            {% if report.summary.total_anomalies > 0 %}
+                <a href="{{ url_for('auto_clean_file', filename=report.filename) }}" class="glow-btn" style="background: linear-gradient(135deg, #FF4C4C, #FF8C00);"><i class="bi bi-trash-fill me-2"></i>Auto Clean (Remove All Anomalies)</a>
+                <a href="{{ url_for('clean_file', filename=report.filename) }}" class="glow-btn"><i class="bi bi-check2-square me-2"></i>Manual Review (Select Rows)</a>
+            {% else %}
+                 <a href="{{ url_for('train_model') }}" class="glow-btn"><i class="bi bi-cpu me-2"></i>Train Model</a>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -219,33 +96,27 @@
 
 {% block extra_scripts %}
 <script>
-// Render Plotly chart if data is available
-{% if chart_json %}
-var chartData = {{ chart_json|safe }};
-Plotly.newPlot('anomalyChart', chartData.data, chartData.layout, {responsive: true});
-{% endif %}
-
-// Copy hash to clipboard
-function copyHash() {
-    const hashElement = document.getElementById('fullHash');
-    const hash = hashElement.textContent.trim();
-    
-    navigator.clipboard.writeText(hash).then(function() {
-        // Show success toast
-        const toast = new bootstrap.Toast(document.getElementById('copyToast'));
-        toast.show();
-    }).catch(function(err) {
-        // Fallback for older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = hash;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        
-        const toast = new bootstrap.Toast(document.getElementById('copyToast'));
-        toast.show();
-    });
-}
+document.addEventListener('DOMContentLoaded', function() {
+    const chartData = {{ chart_json | safe }};
+    const layout = {
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: 'transparent',
+        font: {
+            color: 'var(--text-light)'
+        },
+        xaxis: {
+            gridcolor: 'rgba(255, 255, 255, 0.1)'
+        },
+        yaxis: {
+            gridcolor: 'rgba(255, 255, 255, 0.1)'
+        },
+        legend: {
+            font: {
+                color: 'var(--text-light)'
+            }
+        }
+    };
+    Plotly.newPlot('chart-container', chartData.data, { ...chartData.layout, ...layout }, {responsive: true});
+});
 </script>
 {% endblock %}

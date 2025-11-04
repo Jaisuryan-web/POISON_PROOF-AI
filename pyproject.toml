@@ -11,4 +11,19 @@ dependencies = [
     "pillow==10.0.1",
     "plotly==5.17.0",
     "werkzeug==2.3.7",
+    "scikit-learn>=1.4,<1.6",
+    "tqdm>=4.66,<5.0",
 ]
+
+[project.optional-dependencies]
+reports = [
+    # PDF reports are optional due to platform deps; enable when needed
+    "weasyprint>=60.0; platform_system != 'Windows'",
+]
+
+[tool.uv]
+python-preference = "only-system"
+cache-dir = ".uv-cache"
+
+[project.scripts]
+dev = "run:__main__"
