@@ -1,12 +1,12 @@
 # PoisonProof AI — Advanced Security Platform
 
-🛡️ **Enterprise-grade AI security platform with real-time anomaly detection, ML model training, and cryptographic verification**
+ **Enterprise-grade AI security platform with real-time anomaly detection, ML model training, and cryptographic verification**
 
 > A comprehensive Flask-based security platform that detects data poisoning attacks, injection vulnerabilities, and image manipulation across CSV and image datasets. Features live model training with SSE streaming, automated/manual data cleaning, and a cyber-themed UI with Matrix rain animation.
 
 ---
 
-## 📋 Table of Contents
+##  Table of Contents
 
 - [Quick Start](#-quick-start)
 - [Key Features](#-key-features)
@@ -23,7 +23,7 @@
 
 ---
 
-## ⚡ Quick Start
+##  Quick Start
 
 ### Prerequisites
 - Python 3.10+ (Python 3.12 supported)
@@ -56,9 +56,9 @@ Open your browser to: **http://127.0.0.1:5000**
 
 ---
 
-## 🎯 Key Features
+##  Key Features
 
-### 🔍 Advanced Threat Detection
+###  Advanced Threat Detection
 
 #### CSV Security Scanning
 - **40+ Injection Patterns**: Detects SQL injection, XSS, command injection, path traversal, NoSQL, LDAP injection
@@ -78,7 +78,7 @@ Open your browser to: **http://127.0.0.1:5000**
 - **Blur Detection**: Gradient variance analysis for quality assessment
 - **Dynamic Range Analysis**: Detects washed-out or over-compressed images
 
-### 🧠 Machine Learning Platform
+###  Machine Learning Platform
 
 #### Live Training Console
 - **Real-time SSE Streaming**: Server-Sent Events display training progress live
@@ -108,7 +108,7 @@ Open your browser to: **http://127.0.0.1:5000**
 - **Generator Script**: `generate_training_dataset.py` creates custom datasets
 - **Analysis Tool**: `analyze_dataset.py` validates dataset health
 
-### 🧹 Data Cleaning Modes
+###  Data Cleaning Modes
 
 #### Auto-Clean Mode
 - **One-Click Removal**: Automatically removes all High severity anomalies
