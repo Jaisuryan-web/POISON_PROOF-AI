@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AI Chatbot - PoisonProof AI{% endblock %}</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+
+    {% block extra_head %}
+    <style>
+      #chat-window {
+        height: 70vh;
+        overflow-y: auto;
+        border: 1px solid var(--accent-cyan);
+        background: rgba(0,0,0,0.3);
+        padding: 1rem;
+        border-radius: 8px;
+      }
+      .msg {
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: flex-start;
+      }
+      .msg.user {
+        justify-content: flex-end;
+      }
+      .msg-content {
+        max-width: 70%;
+        padding: 0.5rem 0.75rem;
+        border-radius: 12px;
+        background: var(--accent-cyan);
+        color: #000;
+      }
+      .msg.assistant .msg-content {
+        background: var(--accent-green);
+        color: #000;
+      }
+      #chat-input {
+        width: 100%;
+      }
+    </style>
+    {% endblock %}
+</head>
+<body>
+    <!-- Background Animation Canvas -->
+    <canvas id="cyber-background"></canvas>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="bi bi-shield-check me-2"></i>PoisonProof AI
+            </a>
+            <a class="navbar-brand ms-auto me-0" href="{{ url_for('chat_page') }}" title="AI Chat">
+                <i class="bi bi-robot"></i>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'secure_upload' %}active{% endif %}" href="{{ url_for('secure_upload') }}">Scan Dataset</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'models_dashboard' %}active{% endif %}" href="{{ url_for('models_dashboard') }}">Models</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'train_model' %}active{% endif %}" href="{{ url_for('train_model') }}">Train</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container-fluid mt-5 pt-4">
+        <div class="w-100">
+            {% block content %}
+            <div class="container mt-4">
+                <h1>🤖 Ask the AI</h1>
+                <p>Ask anything about PoisonProof-AI, anomaly detection, hashing, image forensics, or security.</p>
+
+                <div id="chat-window" class="mb-3">
+                    <div class="msg assistant">
+                        <div class="msg-content">Hello! I’m here to help. What would you like to know?</div>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <input type="text" id="chat-input" class="form-control" placeholder="Type your question..." autocomplete="off">
+                    <button class="btn glow-btn" id="send-btn">Send</button>
+                </div>
+            </div>
+            {% endblock %}
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-auto">
+        <div class="container-fluid">
+            <p class="mb-0">&copy; 2025 PoisonProof AI Secure Lab. All rights reserved.</p>
+            <small>Status: <span style="color: var(--accent-green);">All Systems Operational</span></small>
+        </div>
+    </footer>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+    {% block extra_scripts %}
+    <script>
+    const chatWindow = document.getElementById('chat-window');
+    const input = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-btn');
+
+    function appendMessage(role, content) {
+      const msgDiv = document.createElement('div');
+      msgDiv.className = `msg ${role}`;
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'msg-content';
+      contentDiv.textContent = content;
+      msgDiv.appendChild(contentDiv);
+      chatWindow.appendChild(msgDiv);
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const userText = input.value.trim();
+      if (!userText) return;
+      appendMessage('user', userText);
+      input.value = '';
+      sendBtn.disabled = true;
+      sendBtn.textContent = '...';
+
+      try {
+        const r = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({message: userText})
+        });
+        const data = await r.json();
+        if (data.error) throw new Error(data.error);
+        appendMessage('assistant', data.reply);
+      } catch (e) {
+        appendMessage('assistant', `Error: ${e.message}`);
+      } finally {
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send';
+      }
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(); });
+    </script>
+    {% endblock %}
+</body>
+</html>
