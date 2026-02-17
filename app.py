@@ -21,7 +21,7 @@ from utils.cleaner import auto_clean as _auto_clean
 from model_trainer import train_model_streaming as _train_model_streaming
 import uuid
 import re
-
+from utils.summarizer import build_project_summary, format_summary_html
 def create_app(config_name=None):
     """Application factory pattern"""
     app = Flask(__name__)
@@ -54,6 +54,16 @@ def register_routes(app):
     def index():
         """Landing page describing the AI integrity problem"""
         return render_template('index.html')
+    @app.route('/api/summary')
+    def api_summary():
+        summary = build_project_summary(app)
+        return jsonify(summary)
+
+    @app.route('/summary')
+    def human_summary():
+        summary = build_project_summary(app)
+        html = format_summary_html(summary)
+        return Response(html, mimetype='text/html')
 
     @app.route('/upload')
     def upload_page():
