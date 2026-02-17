@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Review Anomalies - PoisonProof AI Secure Lab{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>🔍 Review Anomalies</h1>
+    <p class="text-light opacity-75">Select rows to remove from the dataset.</p>
+
+    <form method="POST">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover">
+                <thead>
+                    <tr>
+                        <th><input type="checkbox" id="selectAll"></th>
+                        <th>Row</th>
+                        <th>Column</th>
+                        <th>Description</th>
+                        <th>Severity</th>
+                        <th>Confidence</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for anomaly in anomalies %}
+                    <tr>
+                        <td><input type="checkbox" name="rows_to_remove" value="{{ anomaly.row }}"></td>
+                        <td>{{ anomaly.row }}</td>
+                        <td>{{ anomaly.column }}</td>
+                        <td>{{ anomaly.description }}</td>
+                        <td><span class="badge bg-{{ 'danger' if anomaly.severity == 'High' else 'warning' if anomaly.severity == 'Medium' else 'info' }}">{{ anomaly.severity }}</span></td>
+                        <td>{{ anomaly.confidence }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="mt-4 text-center">
+            <button type="submit" class="glow-btn">Clean Selected Rows</button>
+            <a href="{{ url_for('secure_upload') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+document.getElementById('selectAll').addEventListener('change', function() {
+    const checkboxes = document.querySelectorAll('input[name="rows_to_remove"]');
+    checkboxes.forEach(cb => cb.checked = this.checked);
+});
+</script>
+{% endblock %}

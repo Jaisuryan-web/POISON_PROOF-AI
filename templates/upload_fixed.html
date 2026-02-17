@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Dataset - PoisonProof AI Secure Lab{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>📁 Upload Dataset</h1>
+    <p class="text-light opacity-75">Upload a CSV file to scan for anomalies.</p>
+
+    <form method="POST" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label for="file" class="form-label">Choose CSV file</label>
+            <input type="file" class="form-control" id="file" name="file" accept=".csv" required>
+        </div>
+        <button type="submit" class="glow-btn">Scan Dataset</button>
+    </form>
+</div>
+{% endblock %}

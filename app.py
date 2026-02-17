@@ -22,7 +22,7 @@ from model_trainer import train_model_streaming as _train_model_streaming
 import uuid
 import re
 from utils.summarizer import build_project_summary, format_summary_html
-from utils.genai import explain_topic, explain_scan_results
+from utils.genai import explain_topic, explain_scan_results, chat_with_gemini
 def create_app(config_name=None):
     """Application factory pattern"""
     app = Flask(__name__)
@@ -55,6 +55,7 @@ def register_routes(app):
     def index():
         """Landing page describing the AI integrity problem"""
         return render_template('index.html')
+    
     @app.route('/api/summary')
     def api_summary():
         summary = build_project_summary(app)
@@ -66,11 +67,38 @@ def register_routes(app):
         html = format_summary_html(summary)
         return Response(html, mimetype='text/html')
 
+    @app.route('/chat')
+    def chat_page():
+        """Chatbot interface page"""
+        return render_template('chatbot.html')
+
+    @app.route('/api/chat', methods=['POST'])
+    def api_chat():
+        """Chat endpoint that maintains conversation history in session."""
+        data = request.get_json(force=True, silent=True) or {}
+        message = data.get('message')
+        if not message:
+            return jsonify({'error': 'Missing message'}), 400
+        try:
+            # Initialize history if not present
+            if 'chat_history' not in session:
+                session['chat_history'] = []
+            # Get AI reply
+            reply = chat_with_gemini(message, session['chat_history'])
+            # Update history
+            session['chat_history'].append({'role': 'user', 'parts': [{'text': message}]})
+            session['chat_history'].append({'role': 'model', 'parts': [{'text': reply}]})
+            # Trim history to last 10 turns to avoid token limits
+            if len(session['chat_history']) > 20:
+                session['chat_history'] = session['chat_history'][-20:]
+            return jsonify({'reply': reply})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
     @app.route('/explain')
     def explain_page():
         topic = request.args.get('topic', 'process_overview')
-        explanation = explain_topic(topic)
+        explanation = explain_topic(topic, provider='gemini')
         return render_template('explain.html', topic=topic, explanation=explanation)
 
     @app.route('/api/explain', methods=['POST'])

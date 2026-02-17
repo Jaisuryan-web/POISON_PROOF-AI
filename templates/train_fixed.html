@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Train Model - PoisonProof AI Secure Lab{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>🧠 Train Anomaly Detection Model</h1>
+    <p class="text-light opacity-75">Upload a cleaned CSV to train a new model.</p>
+
+    <form method="POST" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label for="file" class="form-label">Choose CSV file</label>
+            <input type="file" class="form-control" id="file" name="file" accept=".csv" required>
+        </div>
+        <div class="mb-3">
+            <label for="model_type" class="form-label">Model Type</label>
+            <select class="form-select" id="model_type" name="model_type">
+                <option value="LogisticRegression">Logistic Regression</option>
+                <option value="RandomForest">Random Forest</option>
+                <option value="SVM">Support Vector Machine</option>
+            </select>
+        </div>
+        <button type="submit" class="glow-btn">Start Training</button>
+    </form>
+</div>
+{% endblock %}

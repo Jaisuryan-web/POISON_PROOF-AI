@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Training Live - PoisonProof AI Secure Lab{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>🚀 Training Model</h1>
+    <p class="text-light opacity-75">Job ID: <code>{{ job_id }}</code></p>
+
+    <div id="console" class="bg-dark text-light p-3 rounded" style="font-family: monospace; height: 400px; overflow-y: auto;">
+        <div id="log"></div>
+    </div>
+
+    <div class="mt-3">
+        <a href="{{ url_for('models_dashboard') }}" class="glow-btn">View Models</a>
+    </div>
+</div>
+
+<script>
+    const eventSource = new EventSource('{{ url_for("train_stream", job_id=job_id) }}');
+    const log = document.getElementById('log');
+
+    eventSource.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        if (data.error) {
+            log.innerHTML += '<div class="text-danger">Error: ' + data.error + '</div>';
+        } else if (data.message) {
+            log.innerHTML += '<div>' + data.message + '</div>';
+        }
+        log.scrollTop = log.scrollHeight;
+    };
+
+    eventSource.onerror = function() {
+        log.innerHTML += '<div class="text-warning">Connection closed.</div>';
+    };
+</script>
+{% endblock %}
