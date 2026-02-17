@@ -22,6 +22,7 @@ from model_trainer import train_model_streaming as _train_model_streaming
 import uuid
 import re
 from utils.summarizer import build_project_summary, format_summary_html
+from utils.genai import explain_topic, explain_scan_results
 def create_app(config_name=None):
     """Application factory pattern"""
     app = Flask(__name__)
@@ -64,6 +65,39 @@ def register_routes(app):
         summary = build_project_summary(app)
         html = format_summary_html(summary)
         return Response(html, mimetype='text/html')
+
+
+    @app.route('/explain')
+    def explain_page():
+        topic = request.args.get('topic', 'process_overview')
+        explanation = explain_topic(topic)
+        return render_template('explain.html', topic=topic, explanation=explanation)
+
+    @app.route('/api/explain', methods=['POST'])
+    def api_explain():
+        data = request.get_json(force=True, silent=True) or {}
+        topic = data.get('topic')
+        context = data.get('context')
+        if not topic:
+            return jsonify({'error': 'Missing topic'}), 400
+        try:
+            explanation = explain_topic(topic, context=context)
+            return jsonify({'explanation': explanation})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/explain-scan', methods=['POST'])
+    def api_explain_scan():
+        data = request.get_json(force=True, silent=True) or {}
+        anomalies = data.get('anomalies', [])
+        if not isinstance(anomalies, list):
+            return jsonify({'error': 'anomalies must be a list'}), 400
+        try:
+            explanation = explain_scan_results(anomalies)
+            return jsonify({'explanation': explanation})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
 
     @app.route('/upload')
     def upload_page():

@@ -27,3 +27,7 @@ cache-dir = ".uv-cache"
 
 [project.scripts]
 dev = "run:__main__"
+
+[project.optional-dependencies]
+genai = ["    openai>=1.0.0","]
+
