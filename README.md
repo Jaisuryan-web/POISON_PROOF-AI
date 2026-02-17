@@ -123,7 +123,7 @@ Open your browser to: **http://127.0.0.1:5000**
 - **Location Details**: Shows exact row and column for each anomaly
 - **Granular Control**: Choose which anomalies to keep or remove
 
-### 🎨 Cyber-Themed UI
+###  Cyber-Themed UI
 
 #### Visual Design
 - **Matrix Rain Animation**: Falling green characters (toggleable via navbar)
@@ -186,7 +186,7 @@ Open your browser to: **http://127.0.0.1:5000**
 
 ---
 
-## 📦 Installation
+##  Installation
 
 ### Using uv (Recommended - Fast)
 
@@ -574,7 +574,7 @@ admin*)(|(uid=*
 
 ---
 
-## 🌐 API Documentation
+##  API Documentation
 
 ### Endpoints
 
@@ -758,7 +758,7 @@ ENTROPY_THRESHOLD = 7.0        # Shannon entropy threshold
 
 ---
 
-## 🧪 Testing
+##  Testing
 
 ### Manual Testing
 
@@ -799,7 +799,7 @@ Anomaly types:
 
 ---
 
-## 🚀 Deployment
+##  Deployment
 
 ### Local Production
 
@@ -835,7 +835,7 @@ CMD ["python", "run.py"]
 
 ---
 
-## 🤝 Contributing
+##  Contributing
 
 We welcome contributions! Please follow these guidelines:
 
@@ -892,7 +892,7 @@ We welcome contributions! Please follow these guidelines:
 
 ---
 
-## 📄 License
+##  License
 
 This project is licensed under the **MIT License**.
 
@@ -924,7 +924,7 @@ See [LICENSE](LICENSE) file for full text.
 
 ---
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 - **Bootstrap Team**: Excellent CSS framework
 - **Plotly**: Interactive data visualization library
@@ -935,7 +935,7 @@ See [LICENSE](LICENSE) file for full text.
 
 ---
 
-## 📞 Support
+##  Support
 
 ### Get Help
 - **Email**: joedanielajd@gmail.com
@@ -949,7 +949,7 @@ See [LICENSE](LICENSE) file for full text.
 
 ---
 
-## 🔮 Roadmap
+##  Roadmap
 
 ### Version 2.0 (Planned)
 - [ ] Database persistence (PostgreSQL)
@@ -976,7 +976,7 @@ See [LICENSE](LICENSE) file for full text.
 
 ---
 
-## 📊 Statistics
+##  Statistics
 
 - **Lines of Code**: ~5,000+
 - **Python Files**: 12
@@ -988,7 +988,7 @@ See [LICENSE](LICENSE) file for full text.
 
 ---
 
-## 🎓 Educational Use
+##  Educational Use
 
 This project is designed for:
 - **Cybersecurity Education**: Understanding data poisoning attacks
@@ -999,7 +999,7 @@ This project is designed for:
 
 ---
 
-## ⚠️ Disclaimer
+##  Disclaimer
 
 This is a **proof-of-concept** and **educational tool**. For production use:
 - Implement additional security hardening
@@ -1013,7 +1013,7 @@ This is a **proof-of-concept** and **educational tool**. For production use:
 
 ---
 
-## 📝 Changelog
+##  Changelog
 
 ### Version 1.0.0 (November 5, 2024)
 
@@ -1041,6 +1041,6 @@ This is a **proof-of-concept** and **educational tool**. For production use:
 
 ---
 
-**Made with ❤️ and ☕ by the PoisonProof AI Team**
+**Made with ❤️  by the PoisonProof AI Team**
 
-*Securing AI, One Dataset at a Time* 🛡️
+*Securing AI, One Dataset at a Time* 
