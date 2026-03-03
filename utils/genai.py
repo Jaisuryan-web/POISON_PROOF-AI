@@ -14,6 +14,11 @@ try:
 except Exception:
     openai = None  # type: ignore
 
+try:
+    import google.generativeai as genai
+except Exception:
+    genai = None  # type: ignore
+
 # Default prompts for different topics
 DEFAULT_PROMPTS = {
     "hashing": (
@@ -72,6 +77,25 @@ def _call_openai(prompt: str, model: str = "gpt-4o-mini") -> str:
         return response.choices[0].message.content.strip()
     except Exception as e:
         raise RuntimeError(f"OpenAI API error: {e}")
+
+def chat_with_gemini(message: str, history: List[Dict[str, Any]]) -> str:
+    """
+    Send a message to Gemini with conversation history and return the reply.
+    """
+    if not genai:
+        raise RuntimeError("Google Generative AI library not installed. Install with: pip install google-generativeai")
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY environment variable not set.")
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        # Start a chat with history
+        chat = model.start_chat(history=history)
+        response = chat.send_message(message)
+        return response.text.strip()
+    except Exception as e:
+        raise RuntimeError(f"Gemini API error: {e}")
 
 def explain_topic(topic: str, context: Optional[Dict[str, Any]] = None, provider: str = "openai") -> str:
     """
